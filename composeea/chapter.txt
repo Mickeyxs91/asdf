@@ -1,0 +1,302 @@
+
+C:\Users\michael.kourbelis>
+
+docker swarm leave --force
+Node left the swarm.
+
+C:\Users\michael.kourbelis>
+docker swarm init
+Error response from daemon: could not choose an IP address to advertise since this system has multiple addresses on 
+different interfaces (10.0.2.15 on eth0 and 192.168.99.117 on eth1) - specify one with --advertise-addr
+
+C:\Users\michael.kourbelis>
+docker swarm init 192.168.99.117
+"docker swarm init" accepts no arguments.
+See 'docker swarm init --help'.
+
+Usage:  docker swarm init [OPTIONS]
+
+Initialize a swarm
+
+C:\Users\michael.kourbelis>
+docker swarm init --advertise-addr 192.168.99.117
+Swarm initialized: current node (4rw3mfwgbdoguafl63e39sfqf) is now a manager.
+
+To add a worker to this swarm, run the following command:
+
+docker swarm join --token SWMTKN-1-1sq0tfe1bg2m54lx4bsi6gm5yg49nwtrkzswlnke7j9cvsubpb-f05akie2fbbgz4mm5dc4qmx7u 192.168.99.117:2377
+
+
+C:\Users\michael.kourbelis>
+docker-machine create nodei
+
+C:\Users\michael.kourbelis>
+docker-machine create nodeii
+
+C:\Users\michael.kourbelis>
+docker-machine create nodeiii
+
+C:\Users\michael.kourbelis>docker node ls
+ID                            HOSTNAME            STATUS              AVAILABILITY        MANAGER STATUS      ENGINE VERSION
+4rw3mfwgbdoguafl63e39sfqf *   default             Ready               Active              Leader              19.03.12
+
+
+now lets look at the stacks and how they work....
+i am back in my 3 node swarm that i built earlier and basically i am going to work on the default node as it is the basic one 
+and from there i can add the other nodes at the swarm and make them not leaders as leader is one but i can make them managers (reachables).
+
+
+
+C:\Users\michael.kourbelis>docker-machine ssh nodei
+   ( '>')
+  /) TC (\   Core is distributed with ABSOLUTELY NO WARRANTY.
+ (/-_--_-\)           www.tinycorelinux.net
+
+docker@nodei:~$ docker node update  --role manager nodei
+
+Error response from daemon: This node is not a swarm manager. Use "docker swarm init" or "docker swarm join" to connect this node to swarm and try again.
+
+docker@nodei:~$ docker swarm join --token SWMTKN-1-1sq0tfe1bg2m54lx4bsi6gm5yg49nwtrkzswlnke7j9cvsubpb-f05akie2fbbgz4mm5dc4qmx7u 192.168.99.117:2377
+This node joined a swarm as a worker.
+docker@nodei:~$ exit
+logout
+
+   ( '>')
+  /) TC (\   Core is distributed with ABSOLUTELY NO WARRANTY.
+ (/-_--_-\)           www.tinycorelinux.net
+
+docker@nodeii:~$ docker swarm join --token SWMTKN-1-1sq0tfe1bg2m54lx4bsi6gm5yg49nwtrkzswlnke7j9cvsubpb-f05akie2fbbgz4mm5dc4qmx7u 192.168.99.117:2377
+This node joined a swarm as a worker.
+docker@nodeii:~$ exit
+logout
+
+C:\Users\michael.kourbelis>docker-machine ssh nodeiii
+   ( '>')
+  /) TC (\   Core is distributed with ABSOLUTELY NO WARRANTY.
+ (/-_--_-\)           www.tinycorelinux.net
+
+docker@nodeiii:~$ docker swarm join --token SWMTKN-1-1sq0tfe1bg2m54lx4bsi6gm5yg49nwtrkzswlnke7j9cvsubpb-f05akie2fbbgz4mm5dc4qmx7u 192.168.99.117:2377
+This node joined a swarm as a worker.
+docker@nodeiii:~$ docker node update  --role manager nodeiii
+Error response from daemon: This node is not a swarm manager. Worker nodes can't be used to view or modify cluster state. Please run this command on a manager node or promote the current node to a manager.
+docker@nodeiii:~$ exit
+logout
+exit status 1
+
+C:\Users\michael.kourbelis>docker node update  --role manager nodei
+nodei
+
+C:\Users\michael.kourbelis>docker node update  --role manager nodeii
+nodeii
+
+C:\Users\michael.kourbelis>docker node update  --role manager nodeiii
+nodeiii
+
+
+C:\Users\michael.kourbelis>docker node ls
+ID                            HOSTNAME            STATUS              AVAILABILITY        MANAGER STATUS      ENGINE VERSION
+4rw3mfwgbdoguafl63e39sfqf *   default             Ready               Active              Leader              19.03.12
+gnan5i9dr3siwf2trwjthlvbt     nodei               Ready               Active              Reachable           19.03.12
+0w3bkljkf1seomurqvoyrrbjp     nodeii              Ready               Active              Reachable           19.03.12
+dq7i2cuzid0l8mn25a5la36us     nodeiii             Ready               Active              Reachable           19.03.12
+
+and now i can enter nodei and do some stuff, here we are going to use the voting app example and if you remember our design for that 
+it was five different services and the all had dependencies on each other and it ultimately gave us two different websites,
+you went through and i am sure you crafted the best services list with all the values and options that it needed and it was perfect right?
+well i am here to tell you that now is no longer needed....it was really important for us to use them  and not everything is going to need a stack file.
+but now i have a stack file, lets just take a peek at it rela quick because you will notice that it looks very much like a compose file because it is.
+the only real key here thing you have to change as it has to be at least version 3 or higher.
+the latest version right now is version 3.1 but i am sure that it will change as it continues to change and mature, but you need version 3 in order to use stacks,
+you will notice that we have our redis and our db and our vote and all these things that are probably very similar to you from your own work,you are probably 
+very familiar with those and the images they need and the ports tey need open and all that.....but in this case you will notice deploy.
+deploy here is a new option you will see here that it was specifying how many replicas i want, which is how many copies of that image that need to run at a time, and 
+what happens when i do an update, so when i do an actual stack update which will then do service updates....
+how do i want that to roll out ? 
+do i want to go down at the same time ?
+do i only want one at a time ?
+how much delay between them ?.....there's all sorts of options here
+
+we are just scratching the surface, but you can see like i have a restart policy here that if the containers fails it will automatically restart it :
+
+   restart_policy:
+         condition: on-failure
+
+
+you can see  down here under the database i've actually had constraints put in to make sure that it's on a specific node and we haven't talked really a lot about 
+constraints yet but there are ways for us to label objects that is containers or images or really anything that we can create or destroy in swarm or in 
+Docker itself.
+
+we can actually assign labels to any of those, including nodes and a node that is a manager gets its own labels and this is very easy for us to to do to just say
+hey this container has has to run on a node that has this particular role.......
+As we scroll down we ve got some parallelism options which we have seen before....the delay option is pretty cool if you have some sort of 
+warm up time when you have sort of warm up time when you have containers that spin up, maybe they started ut the don't actually go live for maybe 60 seconds 
+or something, you can add delays there and we will actually look at those later during production blue green deployments but for now you can see those are 
+all pretty standard we've actually got even more options down here, you can actually see that i assign this a specific label (labels: [APP=VOTING])...
+i have a window and a max attempt for a restart policy so if it tries to restart and it continues to fail its not going to try more than three times.....
+
+       restart_policy:
+         condition: on-failure
+         delay: 10s
+         max_attempts: 3
+         window: 120s
+
+lets check it out, all i have to do  is do a docker stack deploy -c (-c flag stands for compose), so i am going to use a compose file and call it 
+vote app through "voteapp"........." docker stack deploy -c compose.yml voteapp "...........
+and there we go.....
+
+C:\Users\michael.kourbelis\Desktop\composee>docker stack deploy -c compose.yml voteapp
+Creating network voteapp_default
+Creating network voteapp_frontend
+Creating network voteapp_backend
+Creating service voteapp_redis
+Creating service voteapp_db
+Creating service voteapp_vote
+Creating service voteapp_result
+Creating service voteapp_worker
+Creating service voteapp_visualizer
+
+it didn't create actually create everything and spin it up thta fast....all it did was create those objects in the scheduler, which will then 
+go through the process of creating the services which then creating the tasks which then creating the containers, it also has to create the networks as 
+you will see here and remember that here we have the frontend and the backend   so it created those as well as a default network which 
+that particular stack file that i had was using a default network and then you see this option for visualizer which is a new one we did not use before 
+and we will see that in a minute.
+so lets take a look at the docker stack command a llitle more......
+
+
+
+C:\Users\michael.kourbelis\Desktop\composee>docker stack
+
+Usage:  docker stack [OPTIONS] COMMAND
+
+Manage Docker stacks
+
+Options:
+      --orchestrator string   Orchestrator to use (swarm|kubernetes|all)
+
+Commands:
+  deploy      Deploy a new stack or update an existing stack
+  ls          List stacks
+  ps          List the tasks in the stack
+  rm          Remove one or more stacks
+  services    List the services in the stack
+
+Run 'docker stack COMMAND --help' for more information on a command.
+
+C:\Users\michael.kourbelis\Desktop\composee>
+
+
+
+you will see that we can deploy we have done that already and then you can see that we have ls, ps, rm and services, so this command doesn't have a 
+whole lot of features to it, its preety simple because all of the functionality is really in the compose file and really in the objects its creating 
+and since we have done that already we can do things like "docker stack ls" which shows just shows us all of our stacks and then if i do 
+docker stack ps voteapp you see the actual tasks and then you can see which node they are running on......
+
+
+C:\Users\michael.kourbelis\Desktop\composee>docker stack ps voteapp
+ID                  NAME                   IMAGE                                          NODE                DESIRED STATE       CURRENT STATE            ERROR                       PORTS
+5gotupbkljjb        voteapp_db.1           postgres:9.4                                   default             Ready               Ready 2 seconds ago
+5m4h9xo62n9e         \_ voteapp_db.1       postgres:9.4                                   nodeiii             Shutdown            Failed 3 seconds ago     "task: non-zero exit (1)"
+mgj7byizthmg         \_ voteapp_db.1       postgres:9.4                                   nodeii              Shutdown            Failed 9 seconds ago     "task: non-zero exit (1)"
+w7mt2wlgsbn9         \_ voteapp_db.1       postgres:9.4                                   nodeii              Shutdown            Failed 15 seconds ago    "task: non-zero exit (1)"
+u9k8engjgm1b         \_ voteapp_db.1       postgres:9.4                                   nodeii              Shutdown            Failed 20 seconds ago    "task: non-zero exit (1)"
+i5pn01yz5v41        voteapp_result.1       dockersamples/examplevotingapp_result:before   nodeii              Running             Running 12 minutes ago
+lvbmpf7e7w6k        voteapp_worker.1       dockersamples/examplevotingapp_worker:latest   nodeii              Shutdown            Failed 28 minutes ago    "task: non-zero exit (1)"
+latayiwyp53y         \_ voteapp_worker.1   dockersamples/examplevotingapp_worker:latest   nodeii              Shutdown            Failed 29 minutes ago    "task: non-zero exit (1)"
+uqslibms6yuq         \_ voteapp_worker.1   dockersamples/examplevotingapp_worker:latest   nodeii              Shutdown            Failed 29 minutes ago    "task: non-zero exit (1)"
+316d1wjhniga        voteapp_visualizer.1   dockersamples/visualizer:latest                nodeiii             Running             Running 31 minutes ago
+scdn99cy93hm        voteapp_worker.1       dockersamples/examplevotingapp_worker:latest   nodeii              Shutdown            Failed 30 minutes ago    "task: non-zero exit (1)"
+kdf32a1qakqd        voteapp_result.1       dockersamples/examplevotingapp_result:before   default             Shutdown            Failed 12 minutes ago    "task: non-zero exit (1)"
+tog4zfmhlpjg        voteapp_vote.1         dockersamples/examplevotingapp_vote:before     nodeiii             Running             Running 33 minutes ago
+6i8pqvxbg9dt        voteapp_redis.1        redis:alpine                                   nodei               Running             Running 33 minutes ago
+nzvufrjidce6        voteapp_vote.2         dockersamples/examplevotingapp_vote:before     nodei               Running             Running 33 minutes ago
+zfgdx5vgl74z        voteapp_redis.2        redis:alpine                                   default             Running             Running 33 minutes ago
+
+C:\Users\michael.kourbelis\Desktop\composee>
+
+
+
+its not actually the containers its actally te tasks that we are seeing here because if it was the actual container we would see a big long name 
+because if you remember the services we created earlier they had these really long names if we actually went and did it docker ps. right?....
+if i did a docker container ls or docker container ps we will see a really long name at the names attribute
+
+
+C:\Users\michael.kourbelis\Desktop\composee>docker container ls
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS               NAMES
+764e92abd367        redis:alpine        "docker-entrypoint.s…"   46 minutes ago      Up 46 minutes       6379/tcp            voteapp_redis.2.zfgdx5vgl74zunorg4l58qms5
+
+
+and that because the all get a guid because every container have to be uniquely named and thats how they guarantee that they are always unique and never collide.
+And the last one is ....  "docker stack services voteapp" and this is the best because it shows me my replicas and its kind like doing a " docker service ls "
+
+
+C:\Users\michael.kourbelis\Desktop\composee>docker stack services voteapp
+ID                  NAME                 MODE                REPLICAS            IMAGE                                          PORTS
+2ffzqqj3edvq        voteapp_redis        replicated          2/2                 redis:alpine                                   *:30000->6379/tcp
+p1kovsw4so7z        voteapp_worker       replicated          0/1                 dockersamples/examplevotingapp_worker:latest
+sag7eovg3b9g        voteapp_result       replicated          1/1                 dockersamples/examplevotingapp_result:before   *:5003->80/tcp
+szem3sh6pbhz        voteapp_db           replicated          0/1                 postgres:9.4
+thpoqadkbw33        voteapp_vote         replicated          2/2                 dockersamples/examplevotingapp_vote:before     *:5000->80/tcp
+xec6633ojqn8        voteapp_visualizer   replicated          1/1                 dockersamples/visualizer:latest                *:8080->8080/tcp
+
+C:\Users\michael.kourbelis\Desktop\composee>
+
+
+it shows me how many replicas i have started so i know whether i ve got the proper number of containers already started, and then if i want to dive deeper then i could 
+do ...docker stack ps.....where there we can get the task names here and we see what nodes they are runnning on....
+
+C:\Users\michael.kourbelis\Desktop\composee>docker stack ps voteapp
+ID                  NAME                   IMAGE                                          NODE                DESIRED STATE       CURRENT STATE               ERROR                       PORTS
+r9loanac7agu        voteapp_db.1           postgres:9.4                                   nodeiii             Ready               Ready 1 second ago
+yel97xslg67f         \_ voteapp_db.1       postgres:9.4                                   nodeiii             Shutdown            Failed 1 second ago         "task: non-zero exit (1)"
+p48e6ifsxm8l         \_ voteapp_db.1       postgres:9.4                                   nodeii              Shutdown            Failed 7 seconds ago        "task: non-zero exit (1)"
+x89ire7azwus         \_ voteapp_db.1       postgres:9.4                                   default             Shutdown            Failed 13 seconds ago       "task: non-zero exit (1)"
+7itw873emonu         \_ voteapp_db.1       postgres:9.4                                   default             Shutdown            Failed 19 seconds ago       "task: non-zero exit (1)"
+5bgdexzrhmg5        voteapp_result.1       dockersamples/examplevotingapp_result:before   nodeii              Running             Running 3 minutes ago
+7ixxdjwcd892         \_ voteapp_result.1   dockersamples/examplevotingapp_result:before   default             Shutdown            Failed 3 minutes ago        "task: non-zero exit (1)"
+t808ut1aq4d3         \_ voteapp_result.1   dockersamples/examplevotingapp_result:before   nodeii              Shutdown            Failed 22 minutes ago       "task: non-zero exit (1)"
+i5pn01yz5v41         \_ voteapp_result.1   dockersamples/examplevotingapp_result:before   nodeii              Shutdown            Failed 41 minutes ago       "task: non-zero exit (1)"
+lvbmpf7e7w6k        voteapp_worker.1       dockersamples/examplevotingapp_worker:latest   nodeii              Shutdown            Failed about an hour ago    "task: non-zero exit (1)"
+latayiwyp53y         \_ voteapp_worker.1   dockersamples/examplevotingapp_worker:latest   nodeii              Shutdown            Failed about an hour ago    "task: non-zero exit (1)"
+uqslibms6yuq         \_ voteapp_worker.1   dockersamples/examplevotingapp_worker:latest   nodeii              Shutdown            Failed about an hour ago    "task: non-zero exit (1)"
+316d1wjhniga        voteapp_visualizer.1   dockersamples/visualizer:latest                nodeiii             Running             Running about an hour ago
+scdn99cy93hm        voteapp_worker.1       dockersamples/examplevotingapp_worker:latest   nodeii              Shutdown            Failed about an hour ago    "task: non-zero exit (1)"
+kdf32a1qakqd        voteapp_result.1       dockersamples/examplevotingapp_result:before   default             Shutdown            Failed about an hour ago    "task: non-zero exit (1)"
+tog4zfmhlpjg        voteapp_vote.1         dockersamples/examplevotingapp_vote:before     nodeiii             Running             Running about an hour ago
+6i8pqvxbg9dt        voteapp_redis.1        redis:alpine                                   nodei               Running             Running about an hour ago
+nzvufrjidce6        voteapp_vote.2         dockersamples/examplevotingapp_vote:before     nodei               Running             Running about an hour ago
+zfgdx5vgl74z        voteapp_redis.2        redis:alpine                                   default             Running             Running about an hour ago
+
+C:\Users\michael.kourbelis\Desktop\composee>
+
+
+
+so these two commands can give you a complete picture of how this entire application is running and if i wanted to deep dive into networking i could do a docker
+network " docker network ls " just ike we normally do and you can see these three new overlay networks that were created for this app and notice that the app name is 
+always at the beggining as the stack alwasy precedes the name of the service so each stack will make sure that that its name is at the front
+
+C:\Users\michael.kourbelis\Desktop\composee>docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+dae42f9c3ff6        bridge              bridge              local
+c9a6f01edc60        docker_gwbridge     bridge              local
+acf36657a3b9        host                host                local
+0457rj03mn6u        ingress             overlay             swarm
+35c6d0774ac4        new_default         bridge              local
+cc4f3c68d312        none                null                local
+0d4d7qts9rxv        voteapp_backend     overlay             swarm
+mmk46nqai7qf        voteapp_default     overlay             swarm
+rtasu3ntcy08        voteapp_frontend    overlay             swarm
+
+C:\Users\michael.kourbelis\Desktop\composee>
+ 
+....and then lets go and check it out.... leyts type at the browser the ip of the service with the port specified on the compose file and then you see the site 
+
+http://192.168.99.117:5003/
+
+
+
+and then on http://192.168.99.117:8080 we have the visualizer which is a preety neat tool for demonstration purposes thats actually made by docker by the way and these are all an open source 
+repo that you can see on the resources section of this section 
+and so we have different colors for each service so
+the voteapp is with blue color and the vote is a pink, 
+now if we go tou our compose file and make a little change 12.46 
+
